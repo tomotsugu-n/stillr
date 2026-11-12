@@ -1,0 +1,402 @@
+/* ===== 基本 ===== */
+:root {
+  --bg: #efeee9;
+  --panel: #f7f6f2;
+  --stage-bg: #e3e1db;
+  --text: #2a2a28;
+  --muted: #85837d;
+  --line: #d9d6cf;
+  --accent: #2a2a28;
+  --accent-text: #f7f6f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: 100vh;
+}
+
+/* ===== 左パネル ===== */
+.panel {
+  padding: 28px 24px 40px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+.brand p {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.block {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.block h2 {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.count {
+  font-weight: 400;
+}
+
+/* ===== 素材 ===== */
+.drop {
+  display: block;
+  padding: 22px 12px;
+  border: 1px dashed var(--muted);
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.drop small {
+  color: var(--muted);
+}
+
+.drop:hover,
+.drop.over {
+  background: var(--stage-bg);
+}
+
+.drop.full {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.media-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.media-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.media-thumb {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  background: var(--stage-bg);
+  overflow: hidden;
+}
+
+.media-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-kind {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.media-actions button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.media-actions button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ===== 選択ボタン ===== */
+.segmented {
+  display: flex;
+  gap: 6px;
+}
+
+.segmented.wrap {
+  flex-wrap: wrap;
+}
+
+.segmented label {
+  cursor: pointer;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented span {
+  display: block;
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.segmented input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.segmented input:focus-visible + span {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+
+/* ===== スライダー ===== */
+.slider {
+  display: grid;
+  grid-template-columns: 84px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.slider input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.slider output {
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== ボタン ===== */
+.btn {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn.primary {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn.ghost {
+  margin-top: 8px;
+  border-color: var(--line);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ===== サウンドトラック ===== */
+.file-btn {
+  margin-top: 0;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.audio-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.audio-item[hidden] {
+  display: none;
+}
+
+/* ===== 書き出しの進み具合 ===== */
+.progress {
+  margin-top: 12px;
+}
+
+.progress[hidden] {
+  display: none;
+}
+
+.progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+
+.progress-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  min-height: 1.7em;
+  margin: 10px 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+/* ===== プレビュー ===== */
+.stage-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: var(--stage-bg);
+}
+
+.stage {
+  position: relative;
+  height: min(82vh, calc((100vw - 340px - 48px) * 16 / 9));
+  aspect-ratio: 9 / 16;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.empty[hidden] {
+  display: none;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 460px);
+}
+
+.transport input {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.time {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 再生用の動画要素は画面に出さない */
+.video-pool {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ===== スマートフォン ===== */
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    max-height: none;
+    border-right: none;
+    order: 2;
+  }
+
+  .stage-wrap {
+    order: 1;
+    padding: 16px;
+  }
+
+  .stage {
+    height: auto;
+    width: min(100%, 360px);
+  }
+}
