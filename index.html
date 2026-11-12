@@ -10,22 +10,22 @@
   <div class="app">
     <aside class="panel">
       <header class="brand">
-        <h1>stillr</h1>
+        <h1>stillr <span class="version">ver1.2.1</span></h1>
         <p>Quiet 9:16 reels</p>
       </header>
 
       <section class="block">
         <h2>Media <span id="count" class="count">0 / 5</span></h2>
         <label class="drop" id="drop">
-          <input type="file" id="file" accept="image/*,video/*,.mov" multiple hidden>
-          <span>Drop photos or videos<br><small>or click to choose (up to 5). Audio files can be dropped too.</small></span>
+          <input type="file" id="file" accept="image/*,video/*,.mov,audio/*,.wav,.aif,.aiff,.mp3" multiple hidden>
+          <span>Drop materials here<br><small>Up to 5 photos or videos and 1 audio file (WAV, MP3 or AIFF). Or click to choose.</small></span>
         </label>
         <ol class="media-list" id="list"></ol>
       </section>
 
       <section class="block">
         <h2>Length</h2>
-        <div class="segmented">
+        <div class="segmented full">
           <label><input type="radio" name="duration" value="10"><span>10s</span></label>
           <label><input type="radio" name="duration" value="20"><span>20s</span></label>
           <label><input type="radio" name="duration" value="30"><span>30s</span></label>
@@ -35,11 +35,7 @@
 
       <section class="block">
         <h2>Soundtrack</h2>
-        <label class="btn ghost file-btn">
-          <input type="file" id="audio-file" accept="audio/*,.wav,.aif,.aiff,.mp3,.m4a" hidden>
-          Choose audio file
-        </label>
-        <p class="hint">WAV, MP3 or AIFF (AIFF in Safari only). Fades out at the end of the video.</p>
+        <p class="hint" id="audio-empty">No soundtrack yet. Drop an audio file into Media above.</p>
         <div class="audio-item" id="audio" hidden>
           <div class="media-info">
             <span class="media-name" id="audio-name"></span>
@@ -48,6 +44,16 @@
           <div class="media-actions">
             <button type="button" id="audio-remove" aria-label="Remove">×</button>
           </div>
+        </div>
+        <div class="fades" id="fades" hidden>
+          <label class="fade-toggle">
+            <input type="checkbox" id="fade-in">
+            <span><svg width="28" height="14" viewBox="0 0 28 14" aria-hidden="true"><path d="M1 13 L13 1 H27" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Fade in</span>
+          </label>
+          <label class="fade-toggle">
+            <input type="checkbox" id="fade-out" checked>
+            <span><svg width="28" height="14" viewBox="0 0 28 14" aria-hidden="true"><path d="M1 1 H15 L27 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Fade out</span>
+          </label>
         </div>
       </section>
 
@@ -58,7 +64,7 @@
 
       <section class="block">
         <h2>Adjust</h2>
-        <label class="slider"><span>Blur</span><input type="range" data-key="abstract" min="0" max="100" value="45"><output></output></label>
+        <label class="slider"><span>Blur</span><input type="range" data-key="abstract" min="0" max="100" value="15"><output></output></label>
         <label class="slider"><span>Motion</span><input type="range" data-key="motion" min="0" max="100" value="50"><output></output></label>
         <label class="slider"><span>Film wear</span><input type="range" data-key="scratch" min="0" max="100" value="30"><output></output></label>
         <label class="slider"><span>Particles</span><input type="range" data-key="dust" min="0" max="100" value="35"><output></output></label>

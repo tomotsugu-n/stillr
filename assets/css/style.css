@@ -8,6 +8,11 @@
   --line: #d9d6cf;
   --accent: #2a2a28;
   --accent-text: #f7f6f2;
+  --select: #657980;
+  --slider-rest: #8eadb8;
+  --preview-empty: #bdc4c4;
+  --preview-empty-text: #4a5a60;
+  --select-text: #ffffff;
   --preview-bg: #1c1c1b;
   --preview-text: #b3b1aa;
   --preview-line: #4a4946;
@@ -23,7 +28,7 @@
 
 body {
   margin: 0;
-  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 14px;
   line-height: 1.7;
   color: var(--text);
@@ -50,6 +55,13 @@ body {
   font-size: 1.6rem;
   font-weight: 400;
   letter-spacing: 0.08em;
+}
+
+.brand .version {
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
 }
 
 .brand p {
@@ -174,6 +186,17 @@ body {
   flex-wrap: wrap;
 }
 
+/* 横幅いっぱいに均等に並べる */
+.segmented.full label {
+  flex: 1;
+}
+
+.segmented.full span {
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+
 .segmented label {
   cursor: pointer;
 }
@@ -191,10 +214,15 @@ body {
   border-radius: 999px;
 }
 
+.segmented label:hover input:not(:checked):not(:disabled) + span {
+  border-color: var(--select);
+  background: rgba(101, 121, 128, 0.12);
+}
+
 .segmented input:checked + span {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-text);
+  background: var(--select);
+  border-color: var(--select);
+  color: var(--select-text);
 }
 
 .segmented input:focus-visible + span {
@@ -211,9 +239,48 @@ body {
   margin-bottom: 6px;
 }
 
+/* 塗り部分は --select、残りは --slider-rest。--fill は JS で値に合わせて更新 */
 .slider input {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  accent-color: var(--accent);
+  height: 4px;
+  margin: 0;
+  border: none;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--select) var(--fill, 50%), var(--slider-rest) var(--fill, 50%));
+  cursor: pointer;
+}
+
+.slider input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--select);
+}
+
+.slider input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--select);
+}
+
+.slider input::-moz-range-track {
+  background: transparent;
+}
+
+.slider input:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 4px;
+}
+
+.slider input:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .slider output {
@@ -239,8 +306,9 @@ body {
 .btn.primary {
   width: 100%;
   padding: 12px;
-  background: var(--accent);
-  color: var(--accent-text);
+  border-color: var(--select);
+  background: var(--select);
+  color: var(--select-text);
 }
 
 .btn.ghost {
@@ -259,11 +327,6 @@ body {
 }
 
 /* ===== サウンドトラック ===== */
-.file-btn {
-  margin-top: 0;
-  cursor: pointer;
-}
-
 .hint {
   margin: 8px 0 0;
   font-size: 0.75rem;
@@ -279,6 +342,44 @@ body {
 
 .audio-item[hidden] {
   display: none;
+}
+
+.fades {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.fade-toggle {
+  flex: 1;
+  cursor: pointer;
+}
+
+.fade-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fade-toggle span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.fade-toggle input:checked + span {
+  background: var(--select);
+  border-color: var(--select);
+  color: var(--select-text);
+}
+
+.fade-toggle input:focus-visible + span {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
 }
 
 /* ===== 書き出しの進み具合 ===== */
@@ -337,6 +438,15 @@ body {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
+/* 素材がないときは、押せない Export と同じ色の面を見せる */
+.stage.is-empty {
+  background: var(--preview-empty);
+}
+
+.stage.is-empty canvas {
+  visibility: hidden;
+}
+
 .stage canvas {
   display: block;
   width: 100%;
@@ -351,7 +461,7 @@ body {
   justify-content: center;
   margin: 0;
   text-align: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--preview-empty-text);
   pointer-events: none;
 }
 

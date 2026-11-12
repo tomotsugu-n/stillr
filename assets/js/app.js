@@ -5,8 +5,7 @@
   const MAX_ITEMS = 5;
   const FPS = 30;
   const BITRATE = 12000000;
-  const AUDIO_FADE_IN = 0.5;
-  const AUDIO_FADE_OUT = 1.5;
+  const AUDIO_FADE = 1.5;
 
   // 雰囲気ごとの色調と、塵の色
   const MOODS = {
@@ -50,12 +49,14 @@
   const state = {
     items: [],
     duration: 20,
-    mood: 'print',
-    abstract: 0.45,
+    mood: 'komorebi',
+    abstract: 0.15,
     motion: 0.5,
     scratch: 0.3,
     dust: 0.35,
     speed: 0.5,
+    fadeIn: false,
+    fadeOut: true,
     seed: 1,
     time: 0,
     playing: false,
@@ -216,10 +217,15 @@
       li.querySelector('[data-act="remove"]').onclick = () => removeItem(item);
       list.appendChild(li);
     });
-    $('#count').textContent = `${state.items.length} / ${MAX_ITEMS}`;
+    updateCount();
     $('#drop').classList.toggle('full', state.items.length >= MAX_ITEMS);
     $('#empty').hidden = readyItems().length > 0;
+    document.querySelector('.stage').classList.toggle('is-empty', readyItems().length === 0);
     $('#export').disabled = state.exporting || readyItems().length === 0;
+  }
+
+  function updateCount() {
+    $('#count').textContent = `${state.items.length} / ${MAX_ITEMS}${audio.buffer ? ' + soundtrack' : ''}`;
   }
 
   // ---------- サウンドトラック ----------
@@ -242,12 +248,13 @@
 
   async function loadAudio(file) {
     ensureAudioContext();
+    const replacing = !!audio.buffer;
     notice(`Loading "${file.name}"…`);
     try {
       const data = await file.arrayBuffer();
       audio.buffer = await audio.ctx.decodeAudioData(data);
       audio.name = file.name;
-      notice('');
+      notice(replacing ? `Replaced the soundtrack with "${file.name}".` : '');
       if (state.playing) startAudio(state.time);
     } catch (e) {
       notice(/\.aiff?$/i.test(file.name)
@@ -279,14 +286,16 @@
     const remain = Math.max(0, state.duration - at);
     const g = audio.gain.gain;
     g.cancelScheduledValues(now);
-    if (at < AUDIO_FADE_IN) {
-      g.setValueAtTime(0, now);
-      g.linearRampToValueAtTime(1, now + AUDIO_FADE_IN - at);
+    if (state.fadeIn && at < AUDIO_FADE) {
+      g.setValueAtTime(at / AUDIO_FADE, now);
+      g.linearRampToValueAtTime(1, now + AUDIO_FADE - at);
     } else {
       g.setValueAtTime(1, now);
     }
-    if (remain > AUDIO_FADE_OUT) g.setValueAtTime(1, now + remain - AUDIO_FADE_OUT);
-    g.linearRampToValueAtTime(0, now + remain);
+    if (state.fadeOut) {
+      if (remain > AUDIO_FADE) g.setValueAtTime(1, now + remain - AUDIO_FADE);
+      g.linearRampToValueAtTime(0, now + remain);
+    }
 
     src.start(now, at % audio.buffer.duration);
     src.stop(now + remain + 0.05);
@@ -305,9 +314,12 @@
   }
 
   function renderAudio() {
-    const box = $('#audio');
-    box.hidden = !audio.buffer;
-    if (!audio.buffer) return;
+    const has = !!audio.buffer;
+    $('#audio').hidden = !has;
+    $('#fades').hidden = !has;
+    $('#audio-empty').hidden = has;
+    updateCount();
+    if (!has) return;
     $('#audio-name').textContent = audio.name;
     $('#audio-length').textContent = fmt(audio.buffer.duration);
   }
@@ -633,6 +645,7 @@
       const out = input.parentElement.querySelector('output');
       const apply = () => {
         const v = Number(input.value) / 100;
+        input.style.setProperty('--fill', `${input.value}%`);
         if (key === 'speed') {
           state.speed = 0.25 + v * 0.75;
           out.textContent = `${state.speed.toFixed(2)}×`;
@@ -665,11 +678,15 @@
     window.addEventListener('dragover', (e) => e.preventDefault());
     window.addEventListener('drop', (e) => e.preventDefault());
 
-    $('#audio-file').onchange = (e) => {
-      if (e.target.files[0]) loadAudio(e.target.files[0]);
-      e.target.value = '';
-    };
     $('#audio-remove').onclick = removeAudio;
+    [['#fade-in', 'fadeIn'], ['#fade-out', 'fadeOut']].forEach(([sel, key]) => {
+      const input = $(sel);
+      input.checked = state[key];
+      input.onchange = () => {
+        state[key] = input.checked;
+        if (state.playing) startAudio(state.time);
+      };
+    });
 
     document.querySelectorAll('input[name="duration"]').forEach((input) => {
       input.checked = Number(input.value) === state.duration;

@@ -143,9 +143,9 @@ void main() {
   // 一瞬だけ映り込むゴミ
   if (hash(vec2(filmFrame, 1.7)) > 0.82) {
     vec2 c = vec2(hash(vec2(filmFrame, 2.3)), hash(vec2(filmFrame, 3.9)));
-    float r = mix(0.003, 0.012, hash(vec2(filmFrame, 5.1)));
+    float r = mix(0.0015, 0.005, hash(vec2(filmFrame, 5.1)));
     float blob = 1.0 - smoothstep(r * 0.5, r, length((vUv - c) * vec2(0.5625, 1.0)));
-    col = mix(col, col * 0.35, blob * uScratch);
+    col = mix(col, vec3(1.0), blob * uScratch);
   }
   // 染みと、明るさのちらつき
   float stain = smoothstep(0.55, 0.85, fbm(vUv * vec2(2.5, 4.4) + uSeed * 1.7 + uTime * 0.01));
