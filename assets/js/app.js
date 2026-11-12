@@ -679,6 +679,10 @@
     window.addEventListener('drop', (e) => e.preventDefault());
 
     $('#audio-remove').onclick = removeAudio;
+    $('#audio-file').onchange = (e) => {
+      if (e.target.files[0]) loadAudio(e.target.files[0]);
+      e.target.value = '';
+    };
     [['#fade-in', 'fadeIn'], ['#fade-out', 'fadeOut']].forEach(([sel, key]) => {
       const input = $(sel);
       input.checked = state[key];

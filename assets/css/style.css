@@ -109,9 +109,9 @@ body {
   background: var(--stage-bg);
 }
 
+/* 写真・動画が5つでも、音声はドロップできるよう操作は止めない */
 .drop.full {
-  opacity: 0.4;
-  pointer-events: none;
+  opacity: 0.6;
 }
 
 .media-list {
@@ -342,6 +342,27 @@ body {
 
 .audio-item[hidden] {
   display: none;
+}
+
+.audio-item .media-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.replace-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.replace-btn:hover {
+  border-color: var(--select);
 }
 
 .fades {
