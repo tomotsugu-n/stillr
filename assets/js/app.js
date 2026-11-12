@@ -246,20 +246,85 @@
     audio.gain.connect(audio.dest);
   }
 
+  // AIFF / AIFF-C（非圧縮）を自前で読み込む。Chrome などブラウザが AIFF を読めない場合に使う
+  function decodeAiff(data) {
+    const view = new DataView(data);
+    const tag = (o) => String.fromCharCode(view.getUint8(o), view.getUint8(o + 1), view.getUint8(o + 2), view.getUint8(o + 3));
+    if (data.byteLength < 12 || tag(0) !== 'FORM' || !/^AIF[FC]$/.test(tag(8))) return null;
+
+    let channels = 0, frames = 0, bits = 0, rate = 0, codec = 'NONE', soundOffset = -1;
+    let o = 12;
+    while (o + 8 <= data.byteLength) {
+      const id = tag(o);
+      const size = view.getUint32(o + 4);
+      const body = o + 8;
+      if (id === 'COMM') {
+        channels = view.getInt16(body);
+        frames = view.getUint32(body + 2);
+        bits = view.getInt16(body + 6);
+        // 80ビット拡張精度の浮動小数点数
+        const exp = view.getUint16(body + 8) & 0x7fff;
+        const mant = view.getUint32(body + 10) * 2 ** 32 + view.getUint32(body + 14);
+        rate = mant * 2 ** (exp - 16383 - 63);
+        if (size >= 22) codec = tag(body + 18);
+      } else if (id === 'SSND') {
+        soundOffset = body + 8 + view.getUint32(body);
+      }
+      o = body + size + (size % 2);
+    }
+    if (!channels || !frames || !rate || soundOffset < 0) return null;
+
+    const read = {
+      NONE: [Math.ceil(bits / 8), (p, n) => {
+        let v = 0;
+        for (let i = 0; i < n; i++) v = v * 256 + view.getUint8(p + i);
+        const max = 2 ** (n * 8);
+        return (v >= max / 2 ? v - max : v) / (max / 2);
+      }],
+      sowt: [Math.ceil(bits / 8), (p, n) => {
+        let v = 0;
+        for (let i = n - 1; i >= 0; i--) v = v * 256 + view.getUint8(p + i);
+        const max = 2 ** (n * 8);
+        return (v >= max / 2 ? v - max : v) / (max / 2);
+      }],
+      fl32: [4, (p) => view.getFloat32(p)],
+      FL32: [4, (p) => view.getFloat32(p)],
+      fl64: [8, (p) => view.getFloat64(p)],
+      FL64: [8, (p) => view.getFloat64(p)]
+    }[codec];
+    if (!read) return null;
+
+    const [bytes, sample] = read;
+    const avail = Math.floor((data.byteLength - soundOffset) / (bytes * channels));
+    const length = Math.min(frames, avail);
+    const buffer = audio.ctx.createBuffer(channels, length, rate);
+    for (let ch = 0; ch < channels; ch++) {
+      const out = buffer.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        out[i] = sample(soundOffset + (i * channels + ch) * bytes, bytes);
+      }
+    }
+    return buffer;
+  }
+
+  async function decodeAudioFile(data) {
+    const aiff = decodeAiff(data);
+    if (aiff) return aiff;
+    return audio.ctx.decodeAudioData(data);
+  }
+
   async function loadAudio(file) {
     ensureAudioContext();
     const replacing = !!audio.buffer;
     notice(`Loading "${file.name}"…`);
     try {
       const data = await file.arrayBuffer();
-      audio.buffer = await audio.ctx.decodeAudioData(data);
+      audio.buffer = await decodeAudioFile(data);
       audio.name = file.name;
       notice(replacing ? `Replaced the soundtrack with "${file.name}".` : '');
       if (state.playing) startAudio(state.time);
     } catch (e) {
-      notice(/\.aiff?$/i.test(file.name)
-        ? `Couldn't load "${file.name}". AIFF loads in Safari only; use WAV or MP3 in Chrome.`
-        : `Couldn't load "${file.name}".`);
+      notice(`Couldn't load "${file.name}". Try a WAV, MP3 or uncompressed AIFF file.`);
     }
     renderAudio();
   }
