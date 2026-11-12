@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,80 +11,80 @@
     <aside class="panel">
       <header class="brand">
         <h1>stillr</h1>
-        <p>静けさのための、9:16 リール動画</p>
+        <p>Quiet 9:16 reels</p>
       </header>
 
       <section class="block">
-        <h2>素材 <span id="count" class="count">0 / 5</span></h2>
+        <h2>Media <span id="count" class="count">0 / 5</span></h2>
         <label class="drop" id="drop">
           <input type="file" id="file" accept="image/*,video/*,.mov" multiple hidden>
-          <span>写真・動画をドロップ<br><small>またはクリックして選択（5つまで）。音声ファイルもドロップできます</small></span>
+          <span>Drop photos or videos<br><small>or click to choose (up to 5). Audio files can be dropped too.</small></span>
         </label>
         <ol class="media-list" id="list"></ol>
       </section>
 
       <section class="block">
-        <h2>長さ</h2>
+        <h2>Length</h2>
         <div class="segmented">
-          <label><input type="radio" name="duration" value="10"><span>10秒</span></label>
-          <label><input type="radio" name="duration" value="20"><span>20秒</span></label>
-          <label><input type="radio" name="duration" value="30"><span>30秒</span></label>
-          <label><input type="radio" name="duration" value="60"><span>1分</span></label>
+          <label><input type="radio" name="duration" value="10"><span>10s</span></label>
+          <label><input type="radio" name="duration" value="20"><span>20s</span></label>
+          <label><input type="radio" name="duration" value="30"><span>30s</span></label>
+          <label><input type="radio" name="duration" value="60"><span>1 min</span></label>
         </div>
       </section>
 
       <section class="block">
-        <h2>サウンドトラック</h2>
+        <h2>Soundtrack</h2>
         <label class="btn ghost file-btn">
           <input type="file" id="audio-file" accept="audio/*,.wav,.aif,.aiff,.mp3,.m4a" hidden>
-          音声ファイルを選ぶ
+          Choose audio file
         </label>
-        <p class="hint">WAV・MP3・AIFF（AIFF は Safari のみ）。長さに合わせて最後はフェードアウトします。</p>
+        <p class="hint">WAV, MP3 or AIFF (AIFF in Safari only). Fades out at the end of the video.</p>
         <div class="audio-item" id="audio" hidden>
           <div class="media-info">
             <span class="media-name" id="audio-name"></span>
             <span class="media-kind" id="audio-length"></span>
           </div>
           <div class="media-actions">
-            <button type="button" id="audio-remove" aria-label="削除">×</button>
+            <button type="button" id="audio-remove" aria-label="Remove">×</button>
           </div>
         </div>
       </section>
 
       <section class="block">
-        <h2>雰囲気</h2>
+        <h2>Mood</h2>
         <div class="segmented wrap" id="mood"></div>
       </section>
 
       <section class="block">
-        <h2>調整</h2>
-        <label class="slider"><span>ぼかし</span><input type="range" data-key="abstract" min="0" max="100" value="45"><output></output></label>
-        <label class="slider"><span>動き</span><input type="range" data-key="motion" min="0" max="100" value="50"><output></output></label>
-        <label class="slider"><span>汚し</span><input type="range" data-key="scratch" min="0" max="100" value="30"><output></output></label>
-        <label class="slider"><span>パーティクル</span><input type="range" data-key="dust" min="0" max="100" value="35"><output></output></label>
-        <label class="slider"><span>速さ</span><input type="range" data-key="speed" min="0" max="100" value="33"><output></output></label>
-        <button type="button" id="shuffle" class="btn ghost">構図を変える</button>
+        <h2>Adjust</h2>
+        <label class="slider"><span>Blur</span><input type="range" data-key="abstract" min="0" max="100" value="45"><output></output></label>
+        <label class="slider"><span>Motion</span><input type="range" data-key="motion" min="0" max="100" value="50"><output></output></label>
+        <label class="slider"><span>Film wear</span><input type="range" data-key="scratch" min="0" max="100" value="30"><output></output></label>
+        <label class="slider"><span>Particles</span><input type="range" data-key="dust" min="0" max="100" value="35"><output></output></label>
+        <label class="slider"><span>Speed</span><input type="range" data-key="speed" min="0" max="100" value="33"><output></output></label>
+        <button type="button" id="shuffle" class="btn ghost">Reframe</button>
       </section>
 
       <section class="block">
-        <button type="button" id="export" class="btn primary" disabled>書き出す</button>
+        <button type="button" id="export" class="btn primary" disabled>Export</button>
         <div class="progress" id="progress" hidden>
           <div class="progress-track"><div class="progress-bar" id="progress-bar"></div></div>
           <span class="progress-label" id="progress-label"></span>
         </div>
         <p class="status" id="status"></p>
-        <a id="download" class="btn" hidden>保存する</a>
+        <a id="download" class="btn" hidden>Save</a>
       </section>
     </aside>
 
     <main class="stage-wrap">
       <div class="stage">
         <canvas id="stage"></canvas>
-        <p class="empty" id="empty">素材を追加すると<br>ここにプレビューが表示されます</p>
+        <p class="empty" id="empty">Add media to<br>see the preview here</p>
       </div>
       <div class="transport">
-        <button type="button" id="play" class="btn">再生</button>
-        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="再生位置">
+        <button type="button" id="play" class="btn">Play</button>
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Playback position">
         <span id="time" class="time">0:00 / 0:20</span>
       </div>
     </main>
@@ -94,5 +94,6 @@
 
   <script src="assets/js/renderer.js"></script>
   <script src="assets/js/app.js"></script>
+  <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
 </body>
 </html>

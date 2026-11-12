@@ -11,35 +11,35 @@
   // 雰囲気ごとの色調と、塵の色
   const MOODS = {
     print: {
-      label: '銀塩プリント',
+      label: 'Silver Print',
       sat: 0.82, contrast: 0.84,
       tint: [1.0, 0.995, 0.97], lift: [0.06, 0.07, 0.065], haze: [0.96, 0.95, 0.92, 0.06],
       pal: [[0.62, 0.70, 0.78], [1.0, 0.86, 0.62], [0.95, 0.55, 0.50]],
       dust: [1.0, 0.98, 0.95]
     },
     silence: {
-      label: '静寂',
+      label: 'Silence',
       sat: 0.0, contrast: 0.88,
       tint: [1.0, 1.0, 1.0], lift: [0.05, 0.05, 0.055], haze: [0.82, 0.82, 0.82, 0.10],
       pal: [[0.25, 0.25, 0.27], [0.75, 0.75, 0.75], [0.95, 0.94, 0.92]],
       dust: [0.9, 0.9, 0.9]
     },
     komorebi: {
-      label: '木漏れ日',
+      label: 'Dappled Light',
       sat: 0.45, contrast: 0.85,
       tint: [1.04, 0.99, 0.90], lift: [0.06, 0.05, 0.035], haze: [0.98, 0.92, 0.82, 0.12],
       pal: [[0.55, 0.50, 0.45], [0.98, 0.88, 0.70], [0.90, 0.70, 0.55]],
       dust: [1.0, 0.95, 0.85]
     },
     dusk: {
-      label: '薄明',
+      label: 'Twilight',
       sat: 0.75, contrast: 0.9,
       tint: [1.05, 0.96, 0.92], lift: [0.05, 0.035, 0.05], haze: [0.95, 0.75, 0.70, 0.08],
       pal: [[0.95, 0.55, 0.60], [0.98, 0.80, 0.45], [0.45, 0.40, 0.60]],
       dust: [1.0, 0.9, 0.85]
     },
     fog: {
-      label: '霧',
+      label: 'Fog',
       sat: 0.35, contrast: 0.8,
       tint: [0.95, 0.99, 1.04], lift: [0.08, 0.09, 0.10], haze: [0.82, 0.86, 0.90, 0.22],
       pal: [[0.60, 0.68, 0.75], [0.88, 0.90, 0.92], [0.50, 0.55, 0.62]],
@@ -93,7 +93,7 @@
       const isImage = file.type.startsWith('image/');
       if (!isVideo && !isImage) continue;
       if (state.items.length >= MAX_ITEMS) {
-        notice('素材は5つまでです。');
+        notice('You can add up to 5 media files.');
         continue;
       }
       const item = { id: nextId++, name: file.name, kind: isVideo ? 'video' : 'image', ready: false };
@@ -139,7 +139,7 @@
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      fail(item, `「${item.name}」を読み込めませんでした（HEIC は Safari でのみ読み込めます）。`);
+      fail(item, `Couldn't load "${item.name}". (HEIC images load in Safari only.)`);
     };
     img.src = url;
   }
@@ -165,7 +165,7 @@
     v.addEventListener('error', () => {
       URL.revokeObjectURL(url);
       v.remove();
-      fail(item, `「${item.name}」を再生できませんでした。このブラウザが対応していない形式の可能性があります。`);
+      fail(item, `Couldn't play "${item.name}". This browser may not support the format.`);
     }, { once: true });
     v.src = url;
     $('#videos').appendChild(v);
@@ -203,12 +203,12 @@
         <div class="media-thumb">${item.thumb ? `<img src="${item.thumb}" alt="">` : ''}</div>
         <div class="media-info">
           <span class="media-name"></span>
-          <span class="media-kind">${item.kind === 'video' ? '動画' : '写真'}${item.ready ? '' : '・読み込み中'}</span>
+          <span class="media-kind">${item.kind === 'video' ? 'Video' : 'Photo'}${item.ready ? '' : ' · Loading'}</span>
         </div>
         <div class="media-actions">
-          <button type="button" data-act="up" aria-label="上へ" ${i === 0 ? 'disabled' : ''}>↑</button>
-          <button type="button" data-act="down" aria-label="下へ" ${i === state.items.length - 1 ? 'disabled' : ''}>↓</button>
-          <button type="button" data-act="remove" aria-label="削除">×</button>
+          <button type="button" data-act="up" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button type="button" data-act="down" aria-label="Move down" ${i === state.items.length - 1 ? 'disabled' : ''}>↓</button>
+          <button type="button" data-act="remove" aria-label="Remove">×</button>
         </div>`;
       li.querySelector('.media-name').textContent = item.name;
       li.querySelector('[data-act="up"]').onclick = () => moveItem(item, -1);
@@ -242,7 +242,7 @@
 
   async function loadAudio(file) {
     ensureAudioContext();
-    notice(`「${file.name}」を読み込み中…`);
+    notice(`Loading "${file.name}"…`);
     try {
       const data = await file.arrayBuffer();
       audio.buffer = await audio.ctx.decodeAudioData(data);
@@ -251,8 +251,8 @@
       if (state.playing) startAudio(state.time);
     } catch (e) {
       notice(/\.aiff?$/i.test(file.name)
-        ? `「${file.name}」を読み込めませんでした。AIFF は Safari でのみ読み込めます。Chrome では WAV か MP3 をお使いください。`
-        : `「${file.name}」を読み込めませんでした。`);
+        ? `Couldn't load "${file.name}". AIFF loads in Safari only; use WAV or MP3 in Chrome.`
+        : `Couldn't load "${file.name}".`);
     }
     renderAudio();
   }
@@ -447,7 +447,7 @@
       }
     } catch (e) {
       console.error(e);
-      if (state.exporting) abortExport('書き出し中にエラーが起きました：' + e.message);
+      if (state.exporting) abortExport('Export failed: ' + e.message);
     } finally {
       requestAnimationFrame(frame);
     }
@@ -482,14 +482,14 @@
   function updateProgress(ratio, label) {
     const pct = Math.round(Math.min(1, Math.max(0, ratio)) * 100);
     $('#progress-bar').style.width = pct + '%';
-    $('#progress-label').textContent = label || `書き出し中… ${pct}%`;
+    $('#progress-label').textContent = label || `Exporting… ${pct}%`;
   }
 
   function startExport() {
     const withAudio = !!audio.buffer;
     const mime = pickMime(withAudio);
     if (!mime) {
-      notice('このブラウザは動画の書き出しに対応していません。Chrome か Safari をお使いください。');
+      notice('This browser can\'t export video. Please use Chrome or Safari.');
       return;
     }
 
@@ -501,7 +501,7 @@
       }
       recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: BITRATE });
     } catch (e) {
-      notice('書き出しを開始できませんでした：' + e.message);
+      notice('Couldn\'t start the export: ' + e.message);
       return;
     }
 
@@ -511,13 +511,13 @@
     };
     recorder.onstop = () => saveRecording(mime);
     recorder.onerror = (e) => {
-      abortExport('書き出し中にエラーが起きました：' + (e.error ? e.error.message : '不明なエラー'));
+      abortExport('Export failed: ' + (e.error ? e.error.message : 'unknown error'));
     };
 
     state.playing = false;
     stopAudio();
     $('#download').hidden = true;
-    notice(`このタブを表示したままお待ちください（約${state.duration}秒）。`);
+    notice(`Keep this tab visible while exporting (about ${state.duration}s).`);
     setExporting(true);
     updateProgress(0);
 
@@ -529,7 +529,7 @@
 
   function finishExport() {
     state.exporting = false;
-    updateProgress(1, '仕上げ中…');
+    updateProgress(1, 'Finishing…');
     if (recorder && recorder.state !== 'inactive') {
       recorder.stop();
       // stop イベントが来ない場合に備えて、集まったデータで保存する
@@ -561,7 +561,7 @@
 
     if (!chunks.length) {
       setExporting(false);
-      notice('動画のデータを受け取れませんでした。もう一度お試しください。');
+      notice('No video data was recorded. Please try again.');
       return;
     }
     const type = (mime || 'video/mp4').split(';')[0];
@@ -581,8 +581,8 @@
 
     setExporting(false);
     notice(ext === 'mp4'
-      ? `書き出しが完了しました（${(blob.size / 1048576).toFixed(1)}MB）。`
-      : '書き出しが完了しました（WebM 形式）。Instagram に投稿するには Chrome か Safari で MP4 を書き出してください。');
+      ? `Export complete (${(blob.size / 1048576).toFixed(1)} MB).`
+      : 'Export complete (WebM). To post on Instagram, export MP4 from Chrome or Safari.');
   }
 
   function setExporting(on) {
@@ -599,7 +599,7 @@
   // ---------- 操作 ----------
 
   function updatePlayButton() {
-    $('#play').textContent = state.playing ? '停止' : '再生';
+    $('#play').textContent = state.playing ? 'Stop' : 'Play';
   }
 
   function setPlaying(on) {

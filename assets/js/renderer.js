@@ -220,7 +220,7 @@ void main() {
       canvas.width = W;
       canvas.height = H;
       const gl = canvas.getContext('webgl2', { antialias: false, alpha: false });
-      if (!gl) throw new Error('このブラウザは WebGL2 に対応していません。');
+      if (!gl) throw new Error('This browser does not support WebGL2.');
       this.gl = gl;
       this.maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
