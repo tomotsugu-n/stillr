@@ -91,6 +91,19 @@
       <div class="stage">
         <canvas id="stage"></canvas>
         <p class="empty" id="empty">Add media to<br>see the preview here</p>
+        <div class="framer" id="framer" hidden>
+          <div class="framer-view" id="framer-view">
+            <canvas id="framer-canvas"></canvas>
+            <div class="framer-path" id="framer-path"></div>
+            <div class="framer-win start" data-key="start"><span>Start</span></div>
+            <div class="framer-win end" data-key="end"><span>End</span></div>
+          </div>
+          <p class="framer-hint" id="framer-hint"></p>
+          <div class="framer-actions">
+            <button type="button" id="framer-reset" class="btn">Auto</button>
+            <button type="button" id="framer-done" class="btn">Done</button>
+          </div>
+        </div>
       </div>
       <div class="transport">
         <button type="button" id="play" class="btn">Play</button>

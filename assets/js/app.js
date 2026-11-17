@@ -134,6 +134,7 @@
       item.w = c.width;
       item.h = c.height;
       item.tex = renderer.createTexture(c);
+      item.src = c;
       item.thumb = makeThumb(c, c.width, c.height);
       item.ready = true;
       renderList();
@@ -175,6 +176,7 @@
   function removeItem(item) {
     const i = state.items.indexOf(item);
     if (i < 0) return;
+    if (framer.item === item) closeFramer();
     state.items.splice(i, 1);
     if (item.tex) renderer.deleteTexture(item.tex);
     if (item.el) {
@@ -200,13 +202,15 @@
     state.items.forEach((item, i) => {
       const li = document.createElement('li');
       li.className = 'media-item';
+      li.classList.toggle('is-framing', framer.item === item);
       li.innerHTML = `
         <div class="media-thumb">${item.thumb ? `<img src="${item.thumb}" alt="">` : ''}</div>
         <div class="media-info">
           <span class="media-name"></span>
-          <span class="media-kind">${item.kind === 'video' ? 'Video' : 'Photo'}${item.ready ? '' : ' · Loading'}</span>
+          <span class="media-kind">${item.kind === 'video' ? 'Video' : 'Photo'}${item.ready ? '' : ' · Loading'}${item.frame ? ' · Framed' : ''}</span>
         </div>
         <div class="media-actions">
+          ${canFrame(item) ? `<button type="button" data-act="frame" aria-label="Set framing" title="Set framing" aria-pressed="${framer.item === item}">⇔</button>` : ''}
           <button type="button" data-act="up" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
           <button type="button" data-act="down" aria-label="Move down" ${i === state.items.length - 1 ? 'disabled' : ''}>↓</button>
           <button type="button" data-act="remove" aria-label="Remove">×</button>
@@ -215,6 +219,8 @@
       li.querySelector('[data-act="up"]').onclick = () => moveItem(item, -1);
       li.querySelector('[data-act="down"]').onclick = () => moveItem(item, 1);
       li.querySelector('[data-act="remove"]').onclick = () => removeItem(item);
+      const frameBtn = li.querySelector('[data-act="frame"]');
+      if (frameBtn) frameBtn.onclick = () => (framer.item === item ? closeFramer() : openFramer(item));
       list.appendChild(li);
     });
     updateCount();
@@ -397,6 +403,15 @@
   };
 
   // 時刻 t に映る素材（重なりの間は2つ）と、その重なり具合
+  // k 番目の素材が映る区間（重なりを含む）
+  function shotSpan(k, n) {
+    const seg = state.duration / n;
+    const fade = n > 1 ? Math.min(1.6, seg * 0.35) : 0;
+    const start = k * seg - (k > 0 ? fade / 2 : 0);
+    const end = (k + 1) * seg + (k < n - 1 ? fade / 2 : 0);
+    return { start, length: end - start };
+  }
+
   function timeline(t) {
     const list = readyItems();
     const n = list.length;
@@ -405,9 +420,8 @@
     const seg = D / n;
     const fade = n > 1 ? Math.min(1.6, seg * 0.35) : 0;
     const shot = (k) => {
-      const start = k * seg - (k > 0 ? fade / 2 : 0);
-      const end = (k + 1) * seg + (k < n - 1 ? fade / 2 : 0);
-      return { item: list[k], index: k, local: t - start, length: end - start };
+      const { start, length } = shotSpan(k, n);
+      return { item: list[k], index: k, local: t - start, length };
     };
     const i = Math.min(n - 1, Math.max(0, Math.floor(t / seg)));
     const b = (i + 1) * seg;
@@ -427,7 +441,8 @@
   }
 
   // 9:16 の切り出し範囲。ゆっくり横に流れ、わずかに寄る（または引く）
-  function framing(shot) {
+  // 横長の素材で構図が指定されていれば、横位置はそれに従う（写真は始点→終点、動画は固定）
+  function framing(shot, auto) {
     const { item, index, local, length } = shot;
     const oa = 9 / 16;
     const sa = item.w / item.h;
@@ -442,9 +457,146 @@
     const spanX = Math.min(freeX * 0.9, 0.0055 * length * state.motion);
     const spanY = Math.min(freeY * 0.9, 0.003 * length * state.motion);
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    const cx = clamp(0.5 + (rand(index, 4) - 0.5) * freeX * 0.6 + dirX * spanX * (p - 0.5), sx / 2, 1 - sx / 2);
+    const f = !auto && item.frame;
+    const cx = f
+      ? clamp(f.start + (f.end - f.start) * p, sx / 2, 1 - sx / 2)
+      : clamp(0.5 + (rand(index, 4) - 0.5) * freeX * 0.6 + dirX * spanX * (p - 0.5), sx / 2, 1 - sx / 2);
     const cy = clamp(0.5 + dirY * spanY * (p - 0.5), sy / 2, 1 - sy / 2);
     return [cx, cy, sx, sy];
+  }
+
+  // ---------- 構図の指定（横長の素材） ----------
+
+  const framer = { item: null };
+
+  const canFrame = (item) => item.ready && item.w / item.h > 9 / 16 + 0.01;
+
+  // 構図の枠の幅（素材の横幅に対する割合）。寄りの平均に合わせる
+  const frameWidth = (item) => Math.min(1, (9 / 16) / (item.w / item.h)) / (1.03 + 0.02 * state.motion);
+
+  function shotOf(item) {
+    const list = readyItems();
+    const index = list.indexOf(item);
+    return { item, index, ...shotSpan(index, list.length) };
+  }
+
+  // 指定がなければ、自動の構図での始点・終点を返す
+  function currentFrame(item) {
+    if (item.frame) return item.frame;
+    const s = shotOf(item);
+    if (item.kind === 'video') {
+      const c = framing({ ...s, local: s.length / 2 }, true)[0];
+      return { start: c, end: c };
+    }
+    return {
+      start: framing({ ...s, local: 0 }, true)[0],
+      end: framing({ ...s, local: s.length }, true)[0]
+    };
+  }
+
+  function paintFramer() {
+    const item = framer.item;
+    if (!item) return;
+    const src = item.kind === 'video' ? item.el : item.src;
+    if (item.kind === 'video' && item.el.readyState < 2) return;
+    const c = $('#framer-canvas');
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  }
+
+  function layoutFramer() {
+    const item = framer.item;
+    if (!item) return;
+    const f = currentFrame(item);
+    const w = frameWidth(item);
+    const pct = (v) => `${(v * 100).toFixed(3)}%`;
+    document.querySelectorAll('.framer-win').forEach((el) => {
+      const v = Math.min(1 - w / 2, Math.max(w / 2, f[el.dataset.key]));
+      el.style.left = pct(v - w / 2);
+      el.style.width = pct(w);
+    });
+    const path = $('#framer-path');
+    const a = Math.min(f.start, f.end), b = Math.max(f.start, f.end);
+    path.hidden = item.kind === 'video' || b - a < 0.01;
+    path.style.left = pct(a);
+    path.style.width = pct(b - a);
+    path.classList.toggle('reverse', f.end < f.start);
+  }
+
+  function openFramer(item) {
+    if (state.exporting || !canFrame(item)) return;
+    setPlaying(false);
+    framer.item = item;
+    const isVideo = item.kind === 'video';
+    const c = $('#framer-canvas');
+    const scale = Math.min(1, 1080 / item.w);
+    c.width = Math.round(item.w * scale);
+    c.height = Math.round(item.h * scale);
+    $('.framer-win.start span').textContent = isVideo ? 'Frame' : 'Start';
+    $('.framer-win.end').hidden = isVideo;
+    $('#framer-hint').textContent = isVideo
+      ? 'Drag the frame to set the crop.'
+      : 'Drag Start and End to set where the pan begins and ends.';
+    // 背後のプレビューもこの素材の場面に合わせておく
+    const s = shotOf(item);
+    state.time = Math.min(state.duration, Math.max(0, s.start + s.length / 2));
+    $('#framer').hidden = false;
+    paintFramer();
+    layoutFramer();
+    renderList();
+  }
+
+  function closeFramer() {
+    if (!framer.item) return;
+    framer.item = null;
+    $('#framer').hidden = true;
+    renderList();
+  }
+
+  function bindFramer() {
+    const view = $('#framer-view');
+    document.querySelectorAll('.framer-win').forEach((el) => {
+      el.addEventListener('pointerdown', (e) => {
+        const item = framer.item;
+        if (!item) return;
+        e.preventDefault();
+        el.setPointerCapture(e.pointerId);
+        el.classList.add('dragging');
+        const key = el.dataset.key;
+        const from = currentFrame(item)[key];
+        const x0 = e.clientX;
+        const width = view.getBoundingClientRect().width;
+        const move = (ev) => {
+          const w = frameWidth(item);
+          const v = Math.min(1 - w / 2, Math.max(w / 2, from + (ev.clientX - x0) / width));
+          const f = { ...currentFrame(item) };
+          if (item.kind === 'video') {
+            f.start = f.end = v;
+          } else {
+            f[key] = v;
+          }
+          item.frame = f;
+          layoutFramer();
+        };
+        const up = () => {
+          el.classList.remove('dragging');
+          el.removeEventListener('pointermove', move);
+          el.removeEventListener('pointerup', up);
+          el.removeEventListener('pointercancel', up);
+          renderList();
+        };
+        el.addEventListener('pointermove', move);
+        el.addEventListener('pointerup', up);
+        el.addEventListener('pointercancel', up);
+      });
+    });
+    $('#framer-reset').onclick = () => {
+      if (!framer.item) return;
+      framer.item.frame = null;
+      layoutFramer();
+      renderList();
+    };
+    $('#framer-done').onclick = closeFramer;
+    window.addEventListener('resize', layoutFramer);
   }
 
   // 映っている動画だけを再生し、タイムラインの位置に合わせる
@@ -513,6 +665,7 @@
       state.time = Math.min(Math.max(0, state.time), D);
 
       draw();
+      if (framer.item && framer.item.kind === 'video') paintFramer();
 
       $('#time').textContent = `${fmt(state.time)} / ${fmt(D)}`;
       if (document.activeElement !== $('#scrub')) {
@@ -593,6 +746,7 @@
 
     state.playing = false;
     stopAudio();
+    closeFramer();
     $('#download').hidden = true;
     notice(`Keep this tab visible while exporting (about ${state.duration}s).`);
     setExporting(true);
@@ -682,6 +836,7 @@
   function setPlaying(on) {
     state.playing = on;
     if (on) {
+      closeFramer();
       if (state.time >= state.duration) state.time = 0;
       startAudio(state.time);
     } else {
@@ -718,6 +873,7 @@
           state[key] = v;
           out.textContent = input.value;
         }
+        if (key === 'motion') layoutFramer();
       };
       input.oninput = apply;
       apply();
@@ -783,6 +939,7 @@
   buildMoods();
   bindSliders();
   bind();
+  bindFramer();
   renderList();
   renderAudio();
   requestAnimationFrame(frame);
