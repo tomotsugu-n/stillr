@@ -2,7 +2,7 @@
 (function () {
   'use strict';
 
-  const MAX_ITEMS = 5;
+  const MAX_ITEMS = 10;
   const FPS = 30;
   const BITRATE = 12000000;
   const AUDIO_FADE = 1.5;
@@ -48,14 +48,15 @@
 
   const state = {
     items: [],
-    duration: 20,
+    duration: 30,
     mood: 'komorebi',
     abstract: 0.15,
     motion: 0.5,
-    scratch: 0.3,
+    scratch: 0.6,
     dust: 0.35,
     speed: 0.5,
     fadeIn: false,
+    master: 'off',   // 簡易マスタリング：'off' / '-6' / '-12'（ピークをこの dBFS にそろえる）
     fadeOut: true,
     seed: 1,
     time: 0,
@@ -94,7 +95,7 @@
       const isImage = file.type.startsWith('image/');
       if (!isVideo && !isImage) continue;
       if (state.items.length >= MAX_ITEMS) {
-        notice('You can add up to 5 media files.');
+        notice(`You can add up to ${MAX_ITEMS} media files.`);
         continue;
       }
       const item = { id: nextId++, name: file.name, kind: isVideo ? 'video' : 'image', ready: false };
@@ -236,7 +237,8 @@
 
   // ---------- サウンドトラック ----------
 
-  const audio = { ctx: null, gain: null, dest: null, buffer: null, name: '', source: null };
+  // offset: 曲のどこから使うか（秒）。peaks: 波形表示用の振幅
+  const audio = { ctx: null, gain: null, dest: null, buffer: null, name: '', source: null, offset: 0, peaks: null };
 
   function isAudioFile(file) {
     return file.type.startsWith('audio/') || /\.(wav|aif|aiff|mp3|m4a|aac)$/i.test(file.name);
@@ -248,6 +250,9 @@
     audio.ctx = new Ctx();
     audio.gain = audio.ctx.createGain();
     audio.gain.connect(audio.ctx.destination);
+    // 音量をそろえる段（フェード用の gain の手前）
+    audio.master = audio.ctx.createGain();
+    audio.master.connect(audio.gain);
     audio.dest = audio.ctx.createMediaStreamDestination();
     audio.gain.connect(audio.dest);
   }
@@ -327,6 +332,10 @@
       const data = await file.arrayBuffer();
       audio.buffer = await decodeAudioFile(data);
       audio.name = file.name;
+      audio.offset = 0;
+      audio.peaks = computePeaks(audio.buffer, 300);
+      audio.peak = peakOf(audio.buffer);
+      applyMaster();
       notice(replacing ? `Replaced the soundtrack with "${file.name}".` : '');
       if (state.playing) startAudio(state.time);
     } catch (e) {
@@ -351,7 +360,7 @@
     const src = ctx.createBufferSource();
     src.buffer = audio.buffer;
     src.loop = true;
-    src.connect(audio.gain);
+    src.connect(audio.master);
 
     const now = ctx.currentTime;
     const remain = Math.max(0, state.duration - at);
@@ -368,7 +377,7 @@
       g.linearRampToValueAtTime(0, now + remain);
     }
 
-    src.start(now, at % audio.buffer.duration);
+    src.start(now, (audio.offset + at) % audio.buffer.duration);
     src.stop(now + remain + 0.05);
     audio.source = src;
   }
@@ -388,11 +397,164 @@
     const has = !!audio.buffer;
     $('#audio').hidden = !has;
     $('#fades').hidden = !has;
+    $('#wave').hidden = !has;
+    $('#master').hidden = !has;
+    $('#wave-range').hidden = !has;
     $('#audio-empty').hidden = has;
     updateCount();
     if (!has) return;
     $('#audio-name').textContent = audio.name;
     $('#audio-length').textContent = fmt(audio.buffer.duration);
+    drawWave();
+    layoutWave();
+  }
+
+  // ---------- サウンドトラックの使う範囲 ----------
+
+  function peakOf(buffer) {
+    let max = 0;
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] < 0 ? -data[i] : data[i];
+        if (v > max) max = v;
+      }
+    }
+    return max;
+  }
+
+  // 簡易マスタリング：曲全体のピークが指定の dBFS になるよう音量を上げ下げする
+  function applyMaster() {
+    if (!audio.master) return;
+    const target = Number(state.master);
+    audio.master.gain.value = state.master === 'off' || !audio.peak
+      ? 1
+      : Math.pow(10, target / 20) / audio.peak;
+  }
+
+  function computePeaks(buffer, bins) {
+    const peaks = new Float32Array(bins);
+    const step = buffer.length / bins;
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let b = 0; b < bins; b++) {
+        const from = Math.floor(b * step), to = Math.floor((b + 1) * step);
+        let max = peaks[b];
+        // 長い曲でも重くならないよう間引いて調べる
+        for (let i = from; i < to; i += 16) {
+          const v = Math.abs(data[i]);
+          if (v > max) max = v;
+        }
+        peaks[b] = max;
+      }
+    }
+    return peaks;
+  }
+
+  // 使える最大の開始位置。曲がリールより短ければ 0（繰り返して使う）
+  const maxOffset = () => (audio.buffer ? Math.max(0, audio.buffer.duration - state.duration) : 0);
+
+  function drawWave() {
+    const c = $('#wave-canvas');
+    if (!audio.peaks || !c.clientWidth) return;
+    const dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(c.clientWidth * dpr);
+    c.height = Math.round(c.clientHeight * dpr);
+    const g = c.getContext('2d');
+    const peaks = audio.peaks;
+    const top = Math.max(...peaks) || 1;
+    const bw = c.width / peaks.length;
+    g.clearRect(0, 0, c.width, c.height);
+    g.fillStyle = getComputedStyle(c).color;
+    peaks.forEach((v, i) => {
+      const h = Math.max(dpr, (v / top) * c.height * 0.9);
+      g.fillRect(i * bw, (c.height - h) / 2, Math.max(dpr, bw - dpr), h);
+    });
+  }
+
+  function layoutWave() {
+    if (!audio.buffer) return;
+    audio.offset = Math.min(audio.offset, maxOffset());
+    const total = audio.buffer.duration;
+    const win = $('#wave-win');
+    win.style.left = `${(audio.offset / total) * 100}%`;
+    win.style.width = `${Math.min(1, state.duration / total) * 100}%`;
+    const end = Math.min(total, audio.offset + state.duration);
+    $('#wave-range').textContent = total > state.duration
+      ? `Uses ${fmt(audio.offset)} – ${fmt(end)}`
+      : `Loops from the start (the track is shorter than the reel)`;
+  }
+
+  // 再生位置を波形の上に示す
+  function updateWaveHead() {
+    const head = $('#wave-head');
+    if (!audio.buffer) return;
+    const on = state.playing || state.exporting;
+    head.hidden = !on;
+    if (on) head.style.left = `${(((audio.offset + state.time) % audio.buffer.duration) / audio.buffer.duration) * 100}%`;
+  }
+
+  function bindMaster() {
+    document.querySelectorAll('input[name="master"]').forEach((input) => {
+      input.checked = input.value === state.master;
+      input.onchange = () => {
+        state.master = input.value;
+        applyMaster();
+      };
+    });
+  }
+
+  // プレビューを頭から描き直す。素材の映像を読み直し、動画の位置も合わせ直す
+  function refreshPreview() {
+    if (state.exporting) return;
+    closeFramer();
+    setPlaying(false);
+    state.time = 0;
+    for (const item of readyItems()) {
+      if (item.kind === 'video') {
+        item.el.pause();
+        item.el.currentTime = 0;
+        item.el.addEventListener('seeked', () => renderer.updateTexture(item.tex, item.el), { once: true });
+      } else if (item.src) {
+        renderer.updateTexture(item.tex, item.src);
+      }
+    }
+    renderList();
+  }
+
+  function bindWave() {
+    const wave = $('#wave');
+    wave.addEventListener('pointerdown', (e) => {
+      if (!audio.buffer || state.exporting) return;
+      e.preventDefault();
+      wave.setPointerCapture(e.pointerId);
+      const rect = wave.getBoundingClientRect();
+      const total = audio.buffer.duration;
+      const toSec = (x) => ((x - rect.left) / rect.width) * total;
+      // 枠の外を押したら、そこを中心に枠を移す
+      const winRect = $('#wave-win').getBoundingClientRect();
+      if (e.clientX < winRect.left || e.clientX > winRect.right) {
+        audio.offset = Math.min(maxOffset(), Math.max(0, toSec(e.clientX) - state.duration / 2));
+        layoutWave();
+      }
+      const from = audio.offset;
+      const x0 = e.clientX;
+      wave.classList.add('dragging');
+      const move = (ev) => {
+        audio.offset = Math.min(maxOffset(), Math.max(0, from + ((ev.clientX - x0) / rect.width) * total));
+        layoutWave();
+      };
+      const up = () => {
+        wave.classList.remove('dragging');
+        wave.removeEventListener('pointermove', move);
+        wave.removeEventListener('pointerup', up);
+        wave.removeEventListener('pointercancel', up);
+        if (state.playing) startAudio(state.time);
+      };
+      wave.addEventListener('pointermove', move);
+      wave.addEventListener('pointerup', up);
+      wave.addEventListener('pointercancel', up);
+    });
   }
 
   // ---------- タイムライン ----------
@@ -440,15 +602,25 @@
     return x - Math.floor(x);
   }
 
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+  // 構図を指定するときの上限
+  const MAX_PAN_SPEED = 0.06;  // 始点→終点の移動：1秒あたり、枠の幅の何倍まで動かせるか
+  const MAX_ZOOM = 2;          // 枠をどこまで縮められるか（2 = 幅・高さとも半分まで）
+
+  // 構図を指定していないときの寄り（始点 → 終点）。ゆっくり引いていく
+  const AUTO_ZOOM_START = 1.05;
+  const AUTO_ZOOM_END = 1.0;
+
   // 9:16 の切り出し範囲。ゆっくり横に流れ、わずかに寄る（または引く）
-  // 横長の素材で構図が指定されていれば、横位置はそれに従う（写真は始点→終点、動画は固定）
+  // 構図が指定されていれば、それに従う（写真は始点→終点へ移動・拡大縮小、動画は固定）
   function framing(shot, auto) {
     const { item, index, local, length } = shot;
+    const p = Math.min(1, Math.max(0, local / length));
+    if (!auto && item.frame) return customFraming(item, length, p);
     const oa = 9 / 16;
     const sa = item.w / item.h;
-    const p = Math.min(1, Math.max(0, local / length));
-    const zoomIn = rand(index, 1) > 0.5;
-    const z = 1.03 + 0.04 * state.motion * (zoomIn ? p : 1 - p);
+    const z = AUTO_ZOOM_START + (AUTO_ZOOM_END - AUTO_ZOOM_START) * p;
     const sx = Math.min(1, oa / sa) / z;
     const sy = Math.min(1, sa / oa) / z;
     const freeX = 1 - sx, freeY = 1 - sy;
@@ -456,23 +628,60 @@
     const dirY = rand(index, 3) > 0.5 ? 1 : -1;
     const spanX = Math.min(freeX * 0.9, 0.0055 * length * state.motion);
     const spanY = Math.min(freeY * 0.9, 0.003 * length * state.motion);
-    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    const f = !auto && item.frame;
-    const cx = f
-      ? clamp(f.start + (f.end - f.start) * p, sx / 2, 1 - sx / 2)
-      : clamp(0.5 + (rand(index, 4) - 0.5) * freeX * 0.6 + dirX * spanX * (p - 0.5), sx / 2, 1 - sx / 2);
+    const cx = clamp(0.5 + (rand(index, 4) - 0.5) * freeX * 0.6 + dirX * spanX * (p - 0.5), sx / 2, 1 - sx / 2);
     const cy = clamp(0.5 + dirY * spanY * (p - 0.5), sy / 2, 1 - sy / 2);
     return [cx, cy, sx, sy];
   }
 
   // ---------- 構図の指定（横長の素材） ----------
+  // item.frame = { start: { x, y, z }, end: { x, y, z } }
+  //   x, y: 枠の中心（素材に対する割合）、z: 寄り（1 = 素材の高さいっぱい）
 
   const framer = { item: null };
 
-  const canFrame = (item) => item.ready && item.w / item.h > 9 / 16 + 0.01;
+  // 動画は縦長でも寄り（切り出す大きさ）を選べる。写真は横長のときだけ
+  const canFrame = (item) => item.ready && (item.kind === 'video' || item.w / item.h > 9 / 16 + 0.01);
 
-  // 構図の枠の幅（素材の横幅に対する割合）。寄りの平均に合わせる
-  const frameWidth = (item) => Math.min(1, (9 / 16) / (item.w / item.h)) / (1.03 + 0.02 * state.motion);
+  // 寄り 1 のときの枠の大きさ（素材に対する割合）
+  function baseSize(item) {
+    const oa = 9 / 16, sa = item.w / item.h;
+    return [Math.min(1, oa / sa), Math.min(1, sa / oa)];
+  }
+
+  // 枠が素材からはみ出さないように中心を収める
+  function fit(item, k) {
+    const [bw, bh] = baseSize(item);
+    const z = clamp(k.z, 1, MAX_ZOOM);
+    const w = bw / z, h = bh / z;
+    return { x: clamp(k.x, w / 2, 1 - w / 2), y: clamp(k.y, h / 2, 1 - h / 2), z };
+  }
+
+  // 始点と終点の距離の上限（素材の幅に対する割合）
+  function maxPan(item, length) {
+    return baseSize(item)[0] * MAX_PAN_SPEED * length;
+  }
+
+  // to を from から上限の距離までに収める
+  function limitTo(item, from, to, length) {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const d = Math.hypot(dx, dy * item.h / item.w);
+    const max = maxPan(item, length);
+    if (d <= max) return to;
+    const r = max / d;
+    return { ...to, x: from.x + dx * r, y: from.y + dy * r };
+  }
+
+  function customFraming(item, length, p) {
+    const [bw, bh] = baseSize(item);
+    const a = fit(item, item.frame.start);
+    const b = item.kind === 'video' ? a : fit(item, limitTo(item, a, item.frame.end, length));
+    const z = Math.exp(Math.log(a.z) + (Math.log(b.z) - Math.log(a.z)) * p);
+    const sx = bw / z, sy = bh / z;
+    const cx = clamp(a.x + (b.x - a.x) * p, sx / 2, 1 - sx / 2);
+    const cy = clamp(a.y + (b.y - a.y) * p, sy / 2, 1 - sy / 2);
+    // テクスチャは上下が反転している（下が 0）ので、画面の上下（上が 0）から変換する
+    return [cx, 1 - cy, sx, sy];
+  }
 
   function shotOf(item) {
     const list = readyItems();
@@ -480,18 +689,24 @@
     return { item, index, ...shotSpan(index, list.length) };
   }
 
-  // 指定がなければ、自動の構図での始点・終点を返す
+  // 表示・編集用の始点と終点。指定がなければ自動の構図から作る
   function currentFrame(item) {
-    if (item.frame) return item.frame;
     const s = shotOf(item);
-    if (item.kind === 'video') {
-      const c = framing({ ...s, local: s.length / 2 }, true)[0];
-      return { start: c, end: c };
+    if (item.frame) {
+      const a = fit(item, item.frame.start);
+      const b = item.kind === 'video' ? a : fit(item, limitTo(item, a, item.frame.end, s.length));
+      return { start: a, end: b };
     }
-    return {
-      start: framing({ ...s, local: 0 }, true)[0],
-      end: framing({ ...s, local: s.length }, true)[0]
+    const bw = baseSize(item)[0];
+    const at = (local) => {
+      const [x, y, sx] = framing({ ...s, local }, true);
+      return { x, y: 1 - y, z: bw / sx };
     };
+    if (item.kind === 'video') {
+      const k = at(s.length / 2);
+      return { start: k, end: k };
+    }
+    return { start: at(0), end: at(s.length) };
   }
 
   function paintFramer() {
@@ -503,23 +718,42 @@
     c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
   }
 
+  // 素材の全体が、下の案内とボタンを残してプレビュー欄に収まる大きさにする
+  function sizeFramer() {
+    const item = framer.item;
+    if (!item) return;
+    const box = $('#framer').getBoundingClientRect();
+    const controls = $('#framer-hint').offsetHeight + $('.framer-actions').offsetHeight + 28 + 24;
+    const width = Math.min(box.width, Math.max(0, box.height - controls) * item.w / item.h);
+    $('#framer-view').style.width = `${width}px`;
+  }
+
   function layoutFramer() {
     const item = framer.item;
     if (!item) return;
     const f = currentFrame(item);
-    const w = frameWidth(item);
+    const [bw, bh] = baseSize(item);
     const pct = (v) => `${(v * 100).toFixed(3)}%`;
     document.querySelectorAll('.framer-win').forEach((el) => {
-      const v = Math.min(1 - w / 2, Math.max(w / 2, f[el.dataset.key]));
-      el.style.left = pct(v - w / 2);
+      const k = f[el.dataset.key];
+      const w = bw / k.z, h = bh / k.z;
+      el.style.left = pct(k.x - w / 2);
+      el.style.top = pct(k.y - h / 2);
       el.style.width = pct(w);
+      el.style.height = pct(h);
+      el.querySelector('.framer-zoom').textContent = k.z > 1.005 ? ` ${k.z.toFixed(2)}×` : '';
     });
+    // 始点の中心から終点の中心への矢印
     const path = $('#framer-path');
-    const a = Math.min(f.start, f.end), b = Math.max(f.start, f.end);
-    path.hidden = item.kind === 'video' || b - a < 0.01;
-    path.style.left = pct(a);
-    path.style.width = pct(b - a);
-    path.classList.toggle('reverse', f.end < f.start);
+    const rect = $('#framer-view').getBoundingClientRect();
+    const x0 = f.start.x * rect.width, y0 = f.start.y * rect.height;
+    const dx = (f.end.x - f.start.x) * rect.width, dy = (f.end.y - f.start.y) * rect.height;
+    const len = Math.hypot(dx, dy);
+    path.hidden = item.kind === 'video' || len < 4;
+    path.style.left = `${x0}px`;
+    path.style.top = `${y0}px`;
+    path.style.width = `${len}px`;
+    path.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
   }
 
   function openFramer(item) {
@@ -531,15 +765,17 @@
     const scale = Math.min(1, 1080 / item.w);
     c.width = Math.round(item.w * scale);
     c.height = Math.round(item.h * scale);
-    $('.framer-win.start span').textContent = isVideo ? 'Frame' : 'Start';
+    $('.framer-win.start .framer-label').textContent = isVideo ? 'Frame' : 'Start';
     $('.framer-win.end').hidden = isVideo;
     $('#framer-hint').textContent = isVideo
-      ? 'Drag the frame to set the crop.'
-      : 'Drag Start and End to set where the pan begins and ends.';
+      ? 'Drag the frame to set the crop. Drag its corner to zoom in.'
+      : 'Drag Start and End to set the pan. Shift-drag to move both. Drag a corner to zoom in.';
     // 背後のプレビューもこの素材の場面に合わせておく
     const s = shotOf(item);
     state.time = Math.min(state.duration, Math.max(0, s.start + s.length / 2));
     $('#framer').hidden = false;
+    sizeFramer();
+    $('#framer-reset').disabled = !item.frame;
     paintFramer();
     layoutFramer();
     renderList();
@@ -552,6 +788,36 @@
     renderList();
   }
 
+  // 片方の枠を変えたあとの構図。写真は、動かしていない側から上限の距離までに収める
+  function setFrameKey(item, key, k) {
+    const f = currentFrame(item);
+    const s = shotOf(item);
+    k = fit(item, k);
+    if (item.kind === 'video') {
+      item.frame = { start: k, end: k };
+      return;
+    }
+    const other = key === 'start' ? f.end : f.start;
+    f[key] = fit(item, limitTo(item, other, k, s.length));
+    item.frame = { start: f.start, end: f.end };
+  }
+
+  function moveBoth(item, f, dx, dy) {
+    const [bw, bh] = baseSize(item);
+    let loX = -Infinity, hiX = Infinity, loY = -Infinity, hiY = Infinity;
+    for (const k of [f.start, f.end]) {
+      const w = bw / k.z, h = bh / k.z;
+      loX = Math.max(loX, w / 2 - k.x);
+      hiX = Math.min(hiX, 1 - w / 2 - k.x);
+      loY = Math.max(loY, h / 2 - k.y);
+      hiY = Math.min(hiY, 1 - h / 2 - k.y);
+    }
+    dx = clamp(dx, loX, hiX);
+    dy = clamp(dy, loY, hiY);
+    const shift = (k) => ({ ...k, x: k.x + dx, y: k.y + dy });
+    item.frame = { start: shift(f.start), end: shift(f.end) };
+  }
+
   function bindFramer() {
     const view = $('#framer-view');
     document.querySelectorAll('.framer-win').forEach((el) => {
@@ -562,23 +828,36 @@
         el.setPointerCapture(e.pointerId);
         el.classList.add('dragging');
         const key = el.dataset.key;
-        const from = currentFrame(item)[key];
-        const x0 = e.clientX;
-        const width = view.getBoundingClientRect().width;
+        const resizing = e.target.classList.contains('framer-handle');
+        const both = e.shiftKey && !resizing && item.kind !== 'video';
+        const start = currentFrame(item);
+        const from = start[key];
+        const x0 = e.clientX, y0 = e.clientY;
+        if (both) document.querySelectorAll('.framer-win').forEach((w) => w.classList.add('dragging'));
         const move = (ev) => {
-          const w = frameWidth(item);
-          const v = Math.min(1 - w / 2, Math.max(w / 2, from + (ev.clientX - x0) / width));
-          const f = { ...currentFrame(item) };
-          if (item.kind === 'video') {
-            f.start = f.end = v;
+          const rect = view.getBoundingClientRect();
+          if (both) {
+            // Shift：始点と終点を同じだけ動かす。どちらもはみ出さない範囲に収める
+            moveBoth(item, start, (ev.clientX - x0) / rect.width, (ev.clientY - y0) / rect.height);
+          } else if (resizing) {
+            // 中心はそのままで、ポインタの位置まで枠を広げ縮めする
+            const [bw, bh] = baseSize(item);
+            const px = (ev.clientX - rect.left) / rect.width;
+            const py = (ev.clientY - rect.top) / rect.height;
+            const w = Math.max(2 * Math.abs(px - from.x), 2 * Math.abs(py - from.y) * bw / bh);
+            setFrameKey(item, key, { ...from, z: bw / Math.max(w, 1e-3) });
           } else {
-            f[key] = v;
+            setFrameKey(item, key, {
+              ...from,
+              x: from.x + (ev.clientX - x0) / rect.width,
+              y: from.y + (ev.clientY - y0) / rect.height
+            });
           }
-          item.frame = f;
           layoutFramer();
+          $('#framer-reset').disabled = false;
         };
         const up = () => {
-          el.classList.remove('dragging');
+          document.querySelectorAll('.framer-win').forEach((w) => w.classList.remove('dragging'));
           el.removeEventListener('pointermove', move);
           el.removeEventListener('pointerup', up);
           el.removeEventListener('pointercancel', up);
@@ -592,11 +871,15 @@
     $('#framer-reset').onclick = () => {
       if (!framer.item) return;
       framer.item.frame = null;
+      $('#framer-reset').disabled = true;
       layoutFramer();
       renderList();
     };
     $('#framer-done').onclick = closeFramer;
-    window.addEventListener('resize', layoutFramer);
+    window.addEventListener('resize', () => {
+      sizeFramer();
+      layoutFramer();
+    });
   }
 
   // 映っている動画だけを再生し、タイムラインの位置に合わせる
@@ -667,6 +950,7 @@
       draw();
       if (framer.item && framer.item.kind === 'video') paintFramer();
 
+      updateWaveHead();
       $('#time').textContent = `${fmt(state.time)} / ${fmt(D)}`;
       if (document.activeElement !== $('#scrub')) {
         $('#scrub').value = Math.round((state.time / D) * 1000);
@@ -873,7 +1157,6 @@
           state[key] = v;
           out.textContent = input.value;
         }
-        if (key === 'motion') layoutFramer();
       };
       input.oninput = apply;
       apply();
@@ -918,6 +1201,7 @@
       input.onchange = () => {
         state.duration = Number(input.value);
         state.time = Math.min(state.time, state.duration);
+        layoutWave();
         if (state.playing) startAudio(state.time);
       };
     });
@@ -927,6 +1211,7 @@
     };
 
     $('#play').onclick = () => setPlaying(!state.playing);
+    $('#refresh').onclick = refreshPreview;
 
     $('#scrub').oninput = (e) => {
       state.time = (Number(e.target.value) / 1000) * state.duration;
@@ -940,6 +1225,8 @@
   bindSliders();
   bind();
   bindFramer();
+  bindWave();
+  bindMaster();
   renderList();
   renderAudio();
   requestAnimationFrame(frame);

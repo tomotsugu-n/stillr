@@ -15,10 +15,10 @@
       </header>
 
       <section class="block">
-        <h2>Media <span id="count" class="count">0 / 5</span></h2>
+        <h2>Media <span id="count" class="count">0 / 10</span></h2>
         <label class="drop" id="drop">
           <input type="file" id="file" accept="image/*,video/*,.mov,audio/*,.wav,.aif,.aiff,.mp3" multiple hidden>
-          <span>Drop materials here<br><small>Up to 5 photos or videos and 1 audio file (WAV, MP3 or AIFF). Or click to choose.</small></span>
+          <span>Drop materials here<br><small>Up to 10 photos or videos and 1 audio file (WAV, MP3 or AIFF). Or click to choose.</small></span>
         </label>
         <ol class="media-list" id="list"></ol>
       </section>
@@ -49,6 +49,12 @@
             <button type="button" id="audio-remove" aria-label="Remove">×</button>
           </div>
         </div>
+        <div class="wave" id="wave" hidden title="Drag to choose which part of the track to use">
+          <canvas id="wave-canvas"></canvas>
+          <div class="wave-win" id="wave-win"></div>
+          <div class="wave-head" id="wave-head" hidden></div>
+        </div>
+        <p class="hint" id="wave-range" hidden></p>
         <div class="fades" id="fades" hidden>
           <label class="fade-toggle">
             <input type="checkbox" id="fade-in">
@@ -58,6 +64,14 @@
             <input type="checkbox" id="fade-out" checked>
             <span><svg width="28" height="14" viewBox="0 0 28 14" aria-hidden="true"><path d="M1 1 H15 L27 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Fade out</span>
           </label>
+        </div>
+        <div class="master" id="master" hidden>
+          <span class="master-label" title="Normalizes the track's peak to the chosen level">Level</span>
+          <div class="segmented full">
+            <label><input type="radio" name="master" value="off"><span>Off</span></label>
+            <label><input type="radio" name="master" value="-6"><span>−6 dB</span></label>
+            <label><input type="radio" name="master" value="-12"><span>−12 dB</span></label>
+          </div>
         </div>
       </section>
 
@@ -70,7 +84,7 @@
         <h2>Adjust</h2>
         <label class="slider"><span>Blur</span><input type="range" data-key="abstract" min="0" max="100" value="15"><output></output></label>
         <label class="slider"><span>Motion</span><input type="range" data-key="motion" min="0" max="100" value="50"><output></output></label>
-        <label class="slider"><span>Film wear</span><input type="range" data-key="scratch" min="0" max="100" value="30"><output></output></label>
+        <label class="slider"><span>Film wear</span><input type="range" data-key="scratch" min="0" max="100" value="60"><output></output></label>
         <label class="slider"><span>Particles</span><input type="range" data-key="dust" min="0" max="100" value="35"><output></output></label>
         <label class="slider"><span>Speed</span><input type="range" data-key="speed" min="0" max="100" value="33"><output></output></label>
         <button type="button" id="shuffle" class="btn ghost">Reframe</button>
@@ -95,12 +109,12 @@
           <div class="framer-view" id="framer-view">
             <canvas id="framer-canvas"></canvas>
             <div class="framer-path" id="framer-path"></div>
-            <div class="framer-win start" data-key="start"><span>Start</span></div>
-            <div class="framer-win end" data-key="end"><span>End</span></div>
+            <div class="framer-win start" data-key="start"><span><b class="framer-label">Start</b><i class="framer-zoom"></i></span><div class="framer-handle"></div></div>
+            <div class="framer-win end" data-key="end"><span><b class="framer-label">End</b><i class="framer-zoom"></i></span><div class="framer-handle"></div></div>
           </div>
           <p class="framer-hint" id="framer-hint"></p>
           <div class="framer-actions">
-            <button type="button" id="framer-reset" class="btn">Auto</button>
+            <button type="button" id="framer-reset" class="btn" title="Back to the default framing">Reset</button>
             <button type="button" id="framer-done" class="btn">Done</button>
           </div>
         </div>
@@ -108,7 +122,8 @@
       <div class="transport">
         <button type="button" id="play" class="btn">Play</button>
         <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Playback position">
-        <span id="time" class="time">0:00 / 0:20</span>
+        <span id="time" class="time">0:00 / 0:30</span>
+        <button type="button" id="refresh" class="btn" title="Redraw the preview from the start">Refresh</button>
       </div>
     </main>
   </div>

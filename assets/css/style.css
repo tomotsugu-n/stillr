@@ -109,7 +109,7 @@ body {
   background: var(--stage-bg);
 }
 
-/* 写真・動画が5つでも、音声はドロップできるよう操作は止めない */
+/* 写真・動画が上限まで入っていても、音声はドロップできるよう操作は止めない */
 .drop.full {
   opacity: 0.6;
 }
@@ -365,6 +365,72 @@ body {
   border-color: var(--select);
 }
 
+/* 簡易マスタリング */
+.master {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.master-label {
+  flex: none;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.master .segmented {
+  flex: 1;
+}
+
+/* 曲の中で使う範囲 */
+.wave {
+  position: relative;
+  height: 44px;
+  margin-top: 12px;
+  border-radius: 4px;
+  background: var(--stage-bg);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.wave canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--slider-rest);
+}
+
+.wave-win {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px solid var(--select);
+  border-radius: 4px;
+  background: rgba(101, 121, 128, 0.18);
+  cursor: grab;
+}
+
+.wave.dragging .wave-win {
+  background: rgba(101, 121, 128, 0.3);
+  cursor: grabbing;
+}
+
+.wave-head {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--text);
+  pointer-events: none;
+}
+
+#wave-range {
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
 .fades {
   display: flex;
   gap: 6px;
@@ -504,6 +570,7 @@ body {
 .framer-view {
   position: relative;
   width: 100%;
+  align-self: center;
   user-select: none;
 }
 
@@ -520,8 +587,31 @@ body {
   bottom: 0;
   border: 2px solid #fff;
   background: rgba(255, 255, 255, 0.08);
-  cursor: ew-resize;
+  cursor: move;
   touch-action: none;
+}
+
+.framer-win b,
+.framer-win i {
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* 右下の角をドラッグして枠を縮める（寄る） */
+.framer-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 2px;
+  background: var(--preview-bg);
+  cursor: nwse-resize;
+}
+
+.framer-win.end .framer-handle {
+  border-color: var(--slider-rest);
 }
 
 .framer-win.end {
@@ -552,11 +642,11 @@ body {
   bottom: 4px;
 }
 
-/* 始点から終点への移動方向 */
+/* 始点の中心から終点の中心への移動方向 */
 .framer-path {
   position: absolute;
-  top: 50%;
   border-top: 1px dashed #fff;
+  transform-origin: 0 0;
   pointer-events: none;
 }
 
@@ -568,13 +658,6 @@ body {
   border: 4px solid transparent;
   border-left: 7px solid #fff;
   border-right: 0;
-}
-
-.framer-path.reverse::after {
-  right: auto;
-  left: -1px;
-  border-left: 0;
-  border-right: 7px solid #fff;
 }
 
 .framer-hint {
